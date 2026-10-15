@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAK API — Live Test Template</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);min-height:100vh;color:#fff;padding:20px}
+.container{max-width:800px;margin:0 auto}
+.header{text-align:center;padding:30px 0}
+.header h1{font-size:2.2em;background:linear-gradient(90deg,#00d2ff,#3a7bd5);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header p{color:#aaa;margin-top:8px}
+.card{background:rgba(255,255,255,.08);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:25px;margin-bottom:20px}
+.card h2{font-size:1.2em;margin-bottom:15px;color:#00d2ff}
+label{display:block;margin-bottom:6px;color:#ccc;font-size:.9em}
+input[type=text],textarea{width:100%;padding:12px;border:1px solid rgba(255,255,255,.2);border-radius:10px;background:rgba(0,0,0,.3);color:#fff;font-size:14px;margin-bottom:15px}
+textarea{height:160px;resize:vertical;font-family:inherit}
+button{background:linear-gradient(90deg,#00d2ff,#3a7bd5);color:#fff;border:none;padding:14px 40px;font-size:16px;border-radius:30px;cursor:pointer;font-weight:600;transition:transform .2s}
+button:hover{transform:scale(1.03)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.results{display:none}
+.score-row{display:flex;gap:15px;margin-bottom:15px}
+.score-box{flex:1;text-align:center;padding:20px;background:rgba(0,0,0,.25);border-radius:12px}
+.score-box .lbl{font-size:.85em;color:#aaa;margin-bottom:8px}
+.score-box .val{font-size:2.5em;font-weight:700}
+.ai-val{color:#ff6b6b}.plag-val{color:#ffa502}
+.meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:.9em;color:#ccc}
+.meta code{background:rgba(0,0,0,.4);padding:4px 10px;border-radius:6px;font-size:.85em}
+.error{background:rgba(255,0,0,.15);border:1px solid #ff6b6b;color:#ff8a8a;padding:15px;border-radius:10px;margin-top:15px;display:none}
+.loading{display:none;text-align:center;padding:20px;color:#00d2ff}
+.spinner{border:3px solid rgba(255,255,255,.2);border-top:3px solid #00d2ff;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.footer{text-align:center;color:#666;font-size:.8em;margin-top:30px}
+.sources{margin-top:15px;font-size:.85em;color:#aaa}
+.sources li{margin-bottom:5px;list-style:none;padding:8px;background:rgba(0,0,0,.2);border-radius:8px}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>🔍 NAK API Live Test</h1>
+<p>Apna API key dalo, text paste karo, foran score dekho!</p>
+</div>
+
+<div class="card">
+<h2>🔑 API Key</h2>
+<label>Apni NAK API key yahan paste karo:</label>
+<input type="text" id="apiKey" placeholder="nak_...">
+</div>
+
+<div class="card">
+<h2>📝 Text Input</h2>
+<label>Test karne wala text (kam az kam 50 characters):</label>
+<textarea id="inputText" placeholder="Yahan paragraph paste karo..."></textarea>
+<button id="scanBtn" onclick="doScan()">🚀 Scan Karo</button>
+<div class="loading" id="loading"><div class="spinner"></div>Scanning... (30-60 sec lag sakta hai)</div>
+<div class="error" id="error"></div>
+</div>
+
+<div class="card results" id="results">
+<h2>📊 Results</h2>
+<div class="score-row">
+<div class="score-box"><div class="lbl">🤖 AI Score</div><div class="val ai-val" id="aiScore">?%</div><div class="lbl" id="aiStatus"></div></div>
+<div class="score-box"><div class="lbl">📋 Plagiarism</div><div class="val plag-val" id="plagScore">?%</div><div class="lbl" id="srcCount"></div></div>
+</div>
+<div class="meta">
+<span>💳 Credits: <b id="credits">?</b></span>
+<span>🆔 <code id="scanId">?</code></span>
+</div>
+<div class="sources" id="sources"></div>
+</div>
+
+<div class="footer">NAK AI Detector API Test Template • Key browser mein hi rehti hai, server par save nahi hoti</div>
+</div>
+
+<script>
+const API_URL = 'https://nak-ai-detector-web-production.up.railway.app/api/scan';
+// CORS proxy (NAK API mein CORS headers nahi hain, is liye proxy zaroori hai)
+const PROXY = 'https://corsproxy.io/?url=';
+
+async function doScan() {
+  const key = document.getElementById('apiKey').value.trim();
+  const text = document.getElementById('inputText').value.trim();
+  const errEl = document.getElementById('error');
+  const resEl = document.getElementById('results');
+  const loadEl = document.getElementById('loading');
+  const btn = document.getElementById('scanBtn');
+  errEl.style.display = 'none'; resEl.style.display = 'none';
+
+  if (!key) { showErr('Pehle API key dalo!'); return; }
+  if (text.length < 50) { showErr('Kam az kam 50 characters likho! (abhi ' + text.length + ' hain)'); return; }
+
+  btn.disabled = true; loadEl.style.display = 'block';
+
+  try {
+    const formData = new FormData();
+    formData.append('file', new Blob([text], {type: 'text/plain'}), 'document.txt');
+
+    const resp = await fetch(PROXY + encodeURIComponent(API_URL), {
+      method: 'POST',
+      headers: { 'X-API-Key': key },
+      body: formData
+    });
+
+    if (!resp.ok) throw new Error('API error: HTTP ' + resp.status);
+
+    const data = await resp.json();
+
+    document.getElementById('aiScore').textContent = (data.ai_text_percentage ?? '?') + '%';
+    document.getElementById('aiStatus').textContent = data.ai_status || '';
+    document.getElementById('plagScore').textContent = (data.similarity_percentage ?? '?') + '%';
+    document.getElementById('srcCount').textContent = (data.similarity_sources || []).length + ' sources';
+    document.getElementById('credits').textContent = data.credits_remaining ?? '?';
+    document.getElementById('scanId').textContent = data.scan_id || '?';
+
+    const srcEl = document.getElementById('sources');
+    const sources = data.similarity_sources || [];
+    if (sources.length > 0) {
+      srcEl.innerHTML = '<b>Top Sources:</b><ul>' + sources.slice(0, 5).map(s =>
+        '<li>' + escapeHtml(s.title || s.url || 'Unknown') + ' — <b>' + (s.similarity || s.score || '?') + '%</b></li>'
+      ).join('') + '</ul>';
+    } else { srcEl.innerHTML = ''; }
+
+    resEl.style.display = 'block';
+  } catch (e) {
+    showErr('Error: ' + e.message + ' (proxy ya API down ho sakti hai, dobara try karo)');
+  } finally {
+    btn.disabled = false; loadEl.style.display = 'none';
+  }
+}
+
+function showErr(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg; el.style.display = 'block';
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Enter se scan (Ctrl+Enter)
+document.getElementById('inputText').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') doScan();
+});
+</script>
+</body>
+</html>
